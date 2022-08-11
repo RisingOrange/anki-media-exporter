@@ -1,20 +1,13 @@
-from concurrent.futures import Future
-import time
-from typing import List, Callable, Any, TYPE_CHECKING, Tuple
-import requests
-import re
 import os
-from zipfile import ZipFile
-from tempfile import TemporaryDirectory
+import re
+from typing import Any, Callable, Generator, Iterable, List
 
-from aqt import mw
-from aqt.webview import AnkiWebView, AnkiWebPage
-from aqt.qt import QWebEngineProfile, QWebEnginePage, QUrl
+import requests
+from aqt.qt import QWebEnginePage, QWebEngineProfile
+from aqt.webview import AnkiWebPage
 
 from .base import FileLike, RootPath
-from .local import LocalRoot
 from .errors import *
-
 
 try:
     from ..google_api_key import get_google_api_key  # type: ignore
@@ -52,9 +45,8 @@ class GDrive:
             url, params={"fields": self.FIELDS_STR, "key": API_KEY}
         ).json()
 
-    def list_paths(self, id: str) -> List[dict]:
+    def get_path_chunks(self, id: str) -> Iterable[List[dict]]:
         url = self.BASE_URL
-        result = []
         page_token = None
         while True:
             data = self.make_request(
@@ -67,13 +59,13 @@ class GDrive:
                     "pageToken": page_token,
                 },
             ).json()
-            result += data["files"]
+
+            yield data["files"]
+
             if not "nextPageToken" in data:
                 break
 
             page_token = data["nextPageToken"]
-
-        return result
 
     def download_file(self, id: str) -> bytes:
         url = f"{self.BASE_URL}/{id}"
@@ -143,25 +135,27 @@ class GDriveRoot(RootPath):
         self.name = data["name"]
         if not gdrive.is_folder(data):
             raise IsAFileError
-        self.files = self.list_files(recursive=True)
 
-    def list_files(self, recursive: bool) -> List["FileLike"]:
+    def list_files(self, recursive: bool) -> Iterable["FileLike"]:
         files: List["FileLike"] = []
-        self.search_files(files, self.id, recursive)
-        return files
+        for file in self.search_files(files, self.id, recursive):
+            yield file
 
-    def search_files(self, files: List["FileLike"], id: str, recursive: bool) -> None:
-        paths = gdrive.list_paths(id)
-        for path in paths:
-            if gdrive.is_folder(path):
-                if recursive:
-                    self.search_files(files, path["id"], recursive=True)
-            elif ("fileExtension" in path) and self.has_media_ext(
-                path["fileExtension"]
-            ):
-                # Google docs files don't have file extensions
-                file = GDriveFile(path)
-                files.append(file)
+    def search_files(
+        self, files: List["FileLike"], id: str, recursive: bool
+    ) -> Iterable["FileLike"]:
+        file_chunks = gdrive.get_path_chunks(id)
+        for chunk in file_chunks:
+            for file_info in chunk:
+                if gdrive.is_folder(file_info):
+                    if recursive:
+                        self.search_files(files, file_info["id"], recursive=True)
+                elif ("fileExtension" in file_info) and self.has_media_ext(
+                    file_info["fileExtension"]
+                ):
+                    # Google docs files don't have file extensions
+                    file = GDriveFile(file_info)
+                    yield file
 
 
 class GDriveFile(FileLike):
