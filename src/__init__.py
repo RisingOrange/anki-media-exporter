@@ -84,7 +84,6 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
         mw.taskman.run_in_background(export_task, on_done=on_done)
 
     action_basic = menu.addAction("Export Media")
-    action_gdrive = menu.addAction("Export Media (exclude files in GDrive)")
     qconnect(action_basic.triggered, export_media)
 
     def export_media_excluding_gdrive_files() -> None:
@@ -92,17 +91,28 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
         if not succeded:
             return
 
-        try:
-            file_names_in_gdrive = [
-                file.name for file in GDriveRoot(url).list_files(recursive=True)
-            ]
-        except PathLikeError as e:
-            showInfo(str(e))
-            return
+        def on_done(future: Future) -> None:
+            try:
+                file_names_in_gdrive = future.result()
+            except PathLikeError as e:
+                showInfo(str(e))
+                return
 
-        export_media(exclude_files=file_names_in_gdrive)
+            export_media(file_names_in_gdrive)
 
+        mw.taskman.with_progress(
+            label="Looking up files in Google drive...",
+            task=lambda: get_gdrive_file_list(url),
+            on_done=on_done,
+        )
+
+    action_gdrive = menu.addAction("Export Media (exclude files in GDrive)")
     qconnect(action_gdrive.triggered, export_media_excluding_gdrive_files)
+
+
+def get_gdrive_file_list(url: str) -> List[str]:
+    result = [file.name for file in GDriveRoot(url).list_files(recursive=True)]
+    return result
 
 
 gui_hooks.deck_browser_will_show_options_menu.append(
