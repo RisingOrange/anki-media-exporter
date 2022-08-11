@@ -5,6 +5,7 @@ to export media from a target deck.
 
 import os
 from concurrent.futures import Future
+from pathlib import Path
 from typing import List, Optional
 
 import aqt
@@ -26,10 +27,12 @@ ADDON_DIR = os.path.dirname(__file__)
 AUDIO_EXTS = aqt.editor.audio
 
 
-def get_export_folder() -> str:
+def get_export_folder() -> Path:
     "Get the export folder from the user."
-    return QFileDialog.getExistingDirectory(
-        mw, caption="Choose the folder where you want to export the files to"
+    return Path(
+        QFileDialog.getExistingDirectory(
+            mw, caption="Choose the folder where you want to export the files to"
+        )
     )
 
 
@@ -53,7 +56,7 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
             for notes_i, (media_i, _) in enumerate(exporter.export(folder, exts)):
                 if notes_i % progress_step == 0:
                     mw.taskman.run_on_main(
-                        lambda notes_i=notes_i + 1, media_i=media_i: update_progress(
+                        lambda notes_i=notes_i + 1, media_i=media_i: update_progress( # type: ignore
                             notes_i, note_count, media_i
                         )
                     )
@@ -85,7 +88,7 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
     action_gdrive = menu.addAction("Export Media (exclude files in GDrive)")
     qconnect(action_basic.triggered, export_media)
 
-    def export_media_excluding_gdrive_files():
+    def export_media_excluding_gdrive_files() -> None:
         url, succeded = getText("Enter the path to the GDrive folder")
         if not succeded:
             return

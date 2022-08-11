@@ -12,7 +12,7 @@ from anki.decks import DeckId
 from anki.notes import Note
 
 
-def get_note_media(col: Collection, note: Note, field: str | None) -> list[str]:
+def get_note_media(col: Collection, note: Note, field: Optional[str]) -> list[str]:
     "Return a list of used media files in `note`."
     if field:
         flds = note[field]
@@ -32,7 +32,7 @@ class MediaExporter(ABC):
         """Return a generator that yields a list of media files for each note that should be exported."""
 
     def export(
-        self, folder: Path | str, exts: set | None = None
+        self, folder: Optional[Path], exts: Optional[set] = None
     ) -> Generator[tuple[int, list[str]], None, None]:
         """
         Export media files in `self.did` to `folder`,
@@ -62,7 +62,7 @@ class MediaExporter(ABC):
 class NoteMediaExporter(MediaExporter):
     """Exporter for a list of notes."""
 
-    def __init__(self, col: Collection, notes: list[Note], field: str | None = None):
+    def __init__(self, col: Collection, notes: list[Note], field: Optional[str] = None):
         self.col = col
         self.notes = notes
         self.field = field
@@ -81,7 +81,7 @@ class DeckMediaExporter(MediaExporter):
         self,
         col: Collection,
         did: DeckId,
-        field: str | None = None,
+        field: Optional[str] = None,
         exclude_files: Optional[List[str]] = None,
     ):
         self.col = col
