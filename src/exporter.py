@@ -1,12 +1,11 @@
 """Media Exporter classes."""
 
-from __future__ import annotations
 
 import os
 import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Generator
+from typing import Generator, List, Optional
 
 from anki.collection import Collection, SearchNode
 from anki.decks import DeckId
@@ -19,7 +18,7 @@ def get_note_media(col: Collection, note: Note, field: str | None) -> list[str]:
         flds = note[field]
     else:
         flds = "".join(note.fields)
-    return col.media.filesInStr(note.mid, flds)
+    return col.media.files_in_str(note.mid, flds)
 
 
 class MediaExporter(ABC):
@@ -30,7 +29,7 @@ class MediaExporter(ABC):
 
     @abstractmethod
     def file_lists(self) -> Generator[list[str], None, None]:
-        """Return a generator that yields a list of media files for each note that should be imported."""
+        """Return a generator that yields a list of media files for each note that should be exported."""
 
     def export(
         self, folder: Path | str, exts: set | None = None
@@ -78,10 +77,17 @@ class NoteMediaExporter(MediaExporter):
 class DeckMediaExporter(MediaExporter):
     "Exporter for all media in a deck."
 
-    def __init__(self, col: Collection, did: DeckId, field: str | None = None):
+    def __init__(
+        self,
+        col: Collection,
+        did: DeckId,
+        field: str | None = None,
+        exclude_files: Optional[List[str]] = None,
+    ):
         self.col = col
         self.did = did
         self.field = field
+        self.excluded_files = exclude_files or []
 
     def file_lists(self) -> Generator[list[str], None, None]:
         "Return a generator that yields a list of media files for each note in the deck with the ID `self.did`"
@@ -91,4 +97,5 @@ class DeckMediaExporter(MediaExporter):
         search = self.col.build_search_string(*search_params)
         for nid in self.col.find_notes(search):
             note = self.col.get_note(nid)
-            yield get_note_media(self.col, note, self.field)
+            note_media = get_note_media(self.col, note, self.field)
+            yield [f for f in note_media if f not in self.excluded_files]

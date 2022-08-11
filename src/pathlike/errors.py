@@ -1,7 +1,7 @@
 from typing import Optional
 
 
-class AddonError(Exception):
+class PathLikeError(Exception):
     """All Exceptions defined in this addon is a subclass of this class"""
 
     def __init__(self, code: Optional[int] = None, msg: Optional[str] = None):
@@ -19,31 +19,31 @@ class AddonError(Exception):
         return errmsg
 
 
-class MalformedURLError(AddonError):
+class MalformedURLError(PathLikeError):
     """The URL doesn't pass regex search. """
     pass
 
 
-class RootNotFoundError(AddonError):
+class RootNotFoundError(PathLikeError):
     """The URL looks fine, but doesn't point to a valid location."""
     pass
 
 
-class IsAFileError(AddonError):
+class IsAFileError(PathLikeError):
     """Expected a directory, but is a file instead. """
     pass
 
 
-class RateLimitError(AddonError):
+class RateLimitError(PathLikeError):
     """Rate Limit Exceeded. """
     pass
 
 
-class ServerError(AddonError):
+class ServerError(PathLikeError):
     """Nothing wrong with the request, but with the server."""
     pass
 
 
-class RequestError(AddonError):
+class RequestError(PathLikeError):
     """Other various errors that happened during request."""
     pass

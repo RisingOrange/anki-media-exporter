@@ -3,18 +3,23 @@ Initialize the add-on, and adds a menu item under the gears icon in the deck lis
 to export media from a target deck.
 """
 
-from __future__ import annotations
-
+import os
 from concurrent.futures import Future
+from typing import List, Optional
 
 import aqt
 from anki.decks import DeckId
 from aqt import gui_hooks, mw
 from aqt.editor import Editor
 from aqt.qt import *
-from aqt.utils import tooltip
+from aqt.utils import getText, showInfo, tooltip
 
+from .api_key import get_google_api_key
 from .exporter import DeckMediaExporter, NoteMediaExporter
+from .pathlike.errors import PathLikeError
+
+os.environ["GOOGLE_API_KEY"] = get_google_api_key()
+from .pathlike.gdrive import GDriveRoot
 
 ADDON_NAME = "Media Exporter"
 ADDON_DIR = os.path.dirname(__file__)
@@ -31,7 +36,7 @@ def get_export_folder() -> str:
 def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
     """Adds a menu item under the gears icon to export a deck's media files."""
 
-    def export_media() -> None:
+    def export_media(exclude_files: Optional[List[str]] = None) -> None:
         folder = get_export_folder()
         config = mw.addonManager.getConfig(__name__)
         exts = set(AUDIO_EXTS) if config.get("audio_only", False) else None
@@ -39,7 +44,9 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
         want_cancel = False
 
         def export_task() -> int:
-            exporter = DeckMediaExporter(mw.col, DeckId(did), field)
+            exporter = DeckMediaExporter(
+                mw.col, DeckId(did), field, exclude_files=exclude_files
+            )
             note_count = mw.col.decks.card_count([DeckId(did)], include_subdecks=True)
             progress_step = min(2500, max(2500, note_count))
             media_i = 0
@@ -74,8 +81,26 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
         mw.progress.set_title(ADDON_NAME)
         mw.taskman.run_in_background(export_task, on_done=on_done)
 
-    action = menu.addAction("Export Media")
-    qconnect(action.triggered, export_media)
+    action_basic = menu.addAction("Export Media")
+    action_gdrive = menu.addAction("Export Media (exclude files in GDrive)")
+    qconnect(action_basic.triggered, export_media)
+
+    def export_media_excluding_gdrive_files():
+        url, succeded = getText("Enter the path to the GDrive folder")
+        if not succeded:
+            return
+
+        try:
+            file_names_in_gdrive = [
+                file.name for file in GDriveRoot(url).list_files(recursive=True)
+            ]
+        except PathLikeError as e:
+            showInfo(str(e))
+            return
+
+        export_media(exclude_files=file_names_in_gdrive)
+
+    qconnect(action_gdrive.triggered, export_media_excluding_gdrive_files)
 
 
 def add_editor_button(buttons: list[str], editor: Editor) -> None:
