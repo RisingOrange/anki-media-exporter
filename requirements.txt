@@ -1,5 +1,5 @@
-anki==2.1.49
-aqt==2.1.49
+anki==2.1.54
+aqt==2.1.54
 PyQt5
 PyQt6
 mypy<1.0
