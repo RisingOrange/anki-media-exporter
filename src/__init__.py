@@ -26,12 +26,10 @@ ADDON_DIR = os.path.dirname(__file__)
 AUDIO_EXTS = aqt.editor.audio
 
 
-def get_export_folder() -> Path:
+def get_export_folder() -> str:
     "Get the export folder from the user."
-    return Path(
-        QFileDialog.getExistingDirectory(
-            mw, caption="Choose the folder where you want to export the files to"
-        )
+    return QFileDialog.getExistingDirectory(
+        mw, caption="Choose the folder where you want to export the files to"
     )
 
 
@@ -39,7 +37,11 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
     """Adds a menu item under the gears icon to export a deck's media files."""
 
     def export_media(exclude_files: Optional[List[str]] = None) -> None:
-        folder = get_export_folder()
+        export_path = get_export_folder()
+        if not export_path:
+            tooltip("Cancelled Export")
+            return
+
         config = mw.addonManager.getConfig(__name__)
         exts = set(AUDIO_EXTS) if config.get("audio_only", False) else None
         field = config.get("search_in_field", None)
@@ -52,7 +54,9 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
             note_count = mw.col.decks.card_count([DeckId(did)], include_subdecks=True)
             progress_step = min(2500, max(2500, note_count))
             media_i = 0
-            for notes_i, (media_i, _) in enumerate(exporter.export(folder, exts)):
+            for notes_i, (media_i, _) in enumerate(
+                exporter.export(Path(export_path), exts)
+            ):
                 if notes_i % progress_step == 0:
                     mw.taskman.run_on_main(
                         lambda notes_i=notes_i + 1, media_i=media_i: update_progress(  # type: ignore
