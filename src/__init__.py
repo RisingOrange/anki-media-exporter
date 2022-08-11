@@ -11,12 +11,11 @@ from typing import List, Optional
 import aqt
 from anki.decks import DeckId
 from aqt import gui_hooks, mw
-from aqt.editor import Editor
 from aqt.qt import *
 from aqt.utils import getText, showInfo, tooltip
 
 from .api_key import get_google_api_key
-from .exporter import DeckMediaExporter, NoteMediaExporter
+from .exporter import DeckMediaExporter
 from .pathlike.errors import PathLikeError
 
 os.environ["GOOGLE_API_KEY"] = get_google_api_key()
@@ -56,7 +55,7 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
             for notes_i, (media_i, _) in enumerate(exporter.export(folder, exts)):
                 if notes_i % progress_step == 0:
                     mw.taskman.run_on_main(
-                        lambda notes_i=notes_i + 1, media_i=media_i: update_progress( # type: ignore
+                        lambda notes_i=notes_i + 1, media_i=media_i: update_progress(  # type: ignore
                             notes_i, note_count, media_i
                         )
                     )
@@ -106,28 +105,6 @@ def on_deck_browser_will_show_options_menu(menu: QMenu, did: int) -> None:
     qconnect(action_gdrive.triggered, export_media_excluding_gdrive_files)
 
 
-def add_editor_button(buttons: list[str], editor: Editor) -> None:
-    "Add an editor button to export media from the current note."
-
-    def on_clicked(editor: Editor) -> None:
-        config = mw.addonManager.getConfig(__name__)
-        exts = set(AUDIO_EXTS) if config.get("audio_only", False) else None
-        field = config.get("search_in_field", None)
-        folder = get_export_folder()
-        exporter = NoteMediaExporter(mw.col, [editor.note], field)
-        media_tuple = list(exporter.export(folder, exts))[0]
-        tooltip(f"Exported {media_tuple[0]} media files", parent=editor.widget)
-
-    button = editor.addButton(
-        icon=os.path.join(ADDON_DIR, "icons", "editor-icon.svg"),
-        cmd="media_exporter",
-        func=on_clicked,
-        tip="Export Media",
-    )
-    buttons.append(button)
-
-
 gui_hooks.deck_browser_will_show_options_menu.append(
     on_deck_browser_will_show_options_menu
 )
-gui_hooks.editor_did_init_buttons.append(add_editor_button)
